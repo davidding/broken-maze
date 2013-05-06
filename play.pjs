@@ -1,0 +1,834 @@
+//Length of side of gridsquare - ALL sizes in game relative to this
+var d = 60;
+
+var quadrantSize = 5;
+var qs = quadrantSize * d;
+var gridSize = quadrantSize * 2;
+var gs = gridSize * d;
+
+//global booleans controlling all balls' movement
+var toHoriz = true;
+var fromHoriz = true;
+var fromVert = true;
+var toVert = true;
+
+var currentLevel = 0;
+var activeQuad = [0, 0];
+var balls = [];
+var blocks = [];
+var levels = [];
+
+function checkActive() {
+    return (this.qx === activeQuad[0] && this.qy === activeQuad[1]);
+}
+
+function checkWalls() {
+    //reset
+    this.canUp = true;
+    this.canDown = true;
+    this.canLeft = true;
+    this.canRight = true;
+
+    this.xBound = this.qx * quadrantSize;
+    this.yBound = this.qy * quadrantSize;
+
+    //check quadrant boundaries
+    if (this.x <= this.xBound) {
+        this.canLeft = false;
+    }
+    if (this.x >= this.xBound + quadrantSize - 1) {
+        this.canRight = false;
+    }
+    if (this.y <= this.yBound) {
+        this.canUp = false;
+    }
+    if (this.y >= this.yBound + quadrantSize - 1) {
+        this.canDown = false;
+    }
+
+    //check horizontal inner walls
+    var hw = levels[currentLevel].hWalls;
+    if (hw) {
+        for (var i = 0; i < hw.length; i++) {
+
+            if (this.x == hw[i][0] && this.y == hw[i][1]) {
+                this.canUp = false;
+            }
+
+            if (this.x == hw[i][0] && this.y == hw[i][1] - 1) {
+                this.canDown = false;
+            }
+        }
+    }
+
+    //check vertical inner walls
+    var vw = levels[currentLevel].vWalls;
+    if (vw) {
+        for (var j = 0; j < vw.length; j++) {
+
+            if (this.x == vw[j][0] && this.y == vw[j][1]) {
+                this.canLeft = false;
+            }
+
+            if (this.x == vw[j][0] - 1 && this.y == vw[j][1]) {
+                this.canRight = false;
+            }
+        }
+    }
+
+
+}
+
+function Ball(x, y, gx, gy) {
+    "use strict";
+    this.x = x;
+    this.y = y;
+
+    this.qx = (this.x < quadrantSize ? 0 : 1);
+    this.qy = (this.y < quadrantSize ? 0 : 1);
+
+    this.canUp = true;
+    this.canDown = true;
+    this.canLeft = true;
+    this.canRight = true;
+
+    this.blocksAround = [null,null,null,null];
+
+    this.active = checkActive;
+
+    this.goalX = gx;
+    this.goalY = gy;
+
+    this.win = function () {
+        return (this.x === this.goalX && this.y === this.goalY);
+    };
+
+    this.draw = function () {
+
+        //draw goal
+        noStroke();
+        fill(119, 119, 255);
+        rect(this.goalX * d + 2, this.goalY * d + 2, d - 4, d - 4);
+
+        //draw ball
+        if (this.active()) {
+            fill(204, 102, 70);
+        } else {
+            fill(70);
+        }
+        stroke(0);
+        strokeWeight(1);
+        ellipse(d * this.x + d / 2, d * this.y + d / 2, 2 * d / 3, 2 * d / 3);
+    };
+
+    this.warn = function () {
+        stroke(255, 51, 51);
+        fill(255, 51, 51);
+        strokeWeight(4);
+        rect(this.x * d, this.y * d, d, d);
+
+    };
+
+    //check for ball's ability to move
+    this.checkWalls = checkWalls;
+
+    this.checkBlocks = function(){
+        this.blocksAround = [null,null,null,null];
+        if(blocks){
+            for(var k = 0; k<blocks.length; k++){
+                //block above
+                if(this.x===blocks[k].x&&this.y===blocks[k].y+1){
+                    //this.blockAbove=true;
+                    if(!blocks[k].canUp){
+                        this.canUp=false;
+                    }
+                    this.blocksAround[0]=k;
+                }
+                //block right
+                if(this.x===blocks[k].x-1&&this.y===blocks[k].y){
+                    //this.blockRight=true;
+                    if(!blocks[k].canRight){
+                        this.canRight=false;
+                    }
+                    this.blocksAround[1]=k;
+                }
+                //block below
+                if(this.x===blocks[k].x&&this.y===blocks[k].y-1){
+                    //this.blockBelow=true;
+                    if(!blocks[k].canDown){
+                        this.canDown=false;
+                    }
+                    this.blocksAround[2]=k;
+                }
+                //block left
+                if(this.x===blocks[k].x+1&&this.y===blocks[k].y){
+                    //this.blockLeft=true;
+                    if(!blocks[k].canLeft){
+                        this.canLeft=false;
+                    }
+                    this.blocksAround[3]=k;
+                }
+            }
+        }
+    };
+
+    this.move = function(direction){
+        if(direction==="up"){
+            this.y--;
+            if(this.blocksAround[0]!==null){
+                blocks[this.blocksAround[0]].move("up");
+            }
+        }
+        if(direction==="down"){
+            this.y++;
+            if(this.blocksAround[2]!==null){
+                blocks[this.blocksAround[2]].move("down");
+            }
+        }
+        if(direction==="left"){
+            this.x--;
+            if(this.blocksAround[3]!==null){
+                blocks[this.blocksAround[3]].move("left");
+            }
+        }
+        if(direction==="right"){
+            this.x++;
+            if(this.blocksAround[1]!==null){
+                blocks[this.blocksAround[1]].move("right");
+            }
+        }
+    };
+
+    this.parseInput = function () {
+        if (keyCode === UP) {
+            if (this.qy === activeQuad[1] && this.canUp && ((this.qy === 0 && fromHoriz) || (this.qy === 1 && toHoriz))) {
+                this.move("up");
+            } else if (this.qy !== activeQuad[1] && this.canDown && ((this.qy === 0 && toHoriz) || (this.qy === 1 && fromHoriz))) {
+                this.move("down");
+            }
+
+            if (this.qy === activeQuad[1] && !this.canUp) {
+                this.warn();
+            }
+            if (this.qy !== activeQuad[1] && !this.canDown) {
+                this.warn();
+            }
+
+        }
+
+        if (keyCode === DOWN) {
+            if (this.qy !== activeQuad[1] && this.canUp && ((this.qy === 0 && fromHoriz) || (this.qy === 1 && toHoriz))) {
+                this.move("up");
+            } else if (this.qy === activeQuad[1] && this.canDown && ((this.qy === 0 && toHoriz) || (this.qy === 1 && fromHoriz))) {
+                this.move("down");
+            }
+
+
+            if (this.qy !== activeQuad[1] && !this.canUp) {
+                this.warn();
+            }
+            if (this.qy === activeQuad[1] && !this.canDown) {
+                this.warn();
+            }
+
+        }
+
+        if (keyCode === LEFT) {
+            if (this.qx === activeQuad[0] && this.canLeft && ((this.qx === 0 && fromVert) || (this.qx === 1 && toVert))) {
+                this.move("left");
+            } else if (this.qx !== activeQuad[0] && this.canRight && ((this.qx === 0 && toVert) || (this.qx === 1 && fromVert))) {
+                this.move("right");
+            }
+            if (this.qx === activeQuad[0] && !this.canLeft) {
+                this.warn();
+            }
+            if (this.qx !== activeQuad[0] && !this.canRight) {
+                this.warn();
+            }
+
+        }
+        if (keyCode === RIGHT) {
+            if (this.qx !== activeQuad[0] && this.canLeft && ((this.qx === 0 && fromVert) || (this.qx === 1 && toVert))) {
+                this.move("left");
+            } else if (this.qx === activeQuad[0] && this.canRight && ((this.qx === 0 && toVert) || (this.qx === 1 && fromVert))) {
+                this.move("right");
+            }
+            if (this.qx !== activeQuad[0] && !this.canLeft) {
+                this.warn();
+            }
+            if (this.qx === activeQuad[0] && !this.canRight) {
+                this.warn();
+            }
+
+        }
+    };
+}
+
+
+function Block(x, y) {
+    "use strict";
+    this.x = x;
+    this.y = y;
+
+    this.qx = (this.x < quadrantSize ? 0 : 1);
+    this.qy = (this.y < quadrantSize ? 0 : 1);
+    this.active = checkActive;
+
+    this.draw = function () {
+
+        if (this.active()) {
+            fill(187, 51, 0);
+        } else {
+            fill(40);
+        }
+
+        stroke(0);
+        strokeWeight(1);
+        rect(this.x * d + 4, this.y * d + 4, d - 8, d - 8);
+    };
+
+    this.canUp = true;
+    this.canDown = true;
+    this.canLeft = true;
+    this.canRight = true;
+
+    this.checkWalls = checkWalls;
+
+    this.checkOtherBlocks = function(){
+        for(var k = 0; k<blocks.length; k++){
+            //block above
+            if(this.x===blocks[k].x&&this.y===blocks[k].y+1){
+                    this.canUp=false;
+            }
+            //block below
+            if(this.x===blocks[k].x&&this.y===blocks[k].y-1){
+                    this.canDown=false;
+            }
+            //block left
+            if(this.x===blocks[k].x+1&&this.y===blocks[k].y){
+                    this.canLeft=false;
+            }
+            //block right
+            if(this.x===blocks[k].x-1&&this.y===blocks[k].y){
+                    this.canRight=false;
+            }
+        }
+    };
+
+    this.move = function(direction){
+        if(direction==="up"){
+            this.y--;
+        }
+        if(direction==="down"){
+            this.y++;
+        }
+        if(direction==="left"){
+            this.x--;
+        }
+        if(direction==="right"){
+            this.x++;
+        }
+
+    };
+
+}
+
+function Level() {
+    "use strict";
+    this.hWalls = [];
+    this.vWalls = [];
+    this.blocks = [];
+    this.balls = [];
+
+    this.load = function () {
+        //level name
+        jQuery("#subtitle").html("Level " + (currentLevel + 1));
+
+        //reset active quad, global balls and blocks arrays
+        activeQuad = [0, 0];
+        balls = [];
+        blocks = [];
+
+        var ba = this.balls;
+        if (ba) {
+            for (var i = 0; i < ba.length; i++) {
+                balls[i] = new Ball(ba[i][0], ba[i][1], ba[i][2], ba[i][3]);
+            }
+        }
+
+        //blocks
+        var bl = this.blocks;
+        if (bl) {
+            for (var k = 0; k < bl.length; k++) {
+                blocks[k] = new Block(bl[k][0], bl[k][1]);
+            }
+        }
+    };
+
+    this.draw = function () {
+
+        //hoizontal inner walls 
+        var hw = this.hWalls;
+        if (hw) {
+            for (var i = 0; i < hw.length; i++) {
+                stroke(0);
+                strokeWeight(4);
+
+                line(hw[i][0] * d, hw[i][1] * d, hw[i][0] * d + d, hw[i][1] * d);
+            }
+        }
+
+        //vertical inner walls
+        var vw = this.vWalls;
+        if (vw) {
+            for (var j = 0; j < vw.length; j++) {
+                stroke(0);
+                strokeWeight(4);
+
+                line(vw[j][0] * d, vw[j][1] * d, vw[j][0] * d, vw[j][1] * d + d);
+            }
+        }
+    };
+}
+
+function drawGrid() {
+    background(170);
+    for (var j = 0; j < quadrantSize; j++) {
+        for (var i = 0; i < quadrantSize; i++) {
+            stroke(255);
+            //Checkerboard effect
+            if ((i + j) % 2 === 0) {
+                noFill();
+            } else {
+                fill(220);
+            }
+            rect(i * d, j * d, d, d);
+            rect((quadrantSize + i) * d, j * d, d, d);
+            rect((quadrantSize + i) * d, (quadrantSize + j) * d, d, d);
+            rect(i * d, (quadrantSize + j) * d, d, d);
+        }
+    }
+    //main boundaries:
+    stroke(0);
+    strokeWeight(4);
+    noFill();
+    rect(0, 0, qs, qs);
+    rect(qs, 0, qs, qs);
+    rect(qs, qs, qs, qs);
+    rect(0, qs, qs, qs);
+
+}
+
+function drawBalls() {
+    for (var i = 0; i < balls.length; i++) {
+        balls[i].draw();
+    }
+}
+
+function drawBlocks() {
+    var bl = blocks;
+    if (bl) {
+        for (var k = 0; k < bl.length; k++) {
+            bl[k].draw();
+        }
+    }
+}
+
+//determine which movements allowed based on individual balls' abilities
+function globalCheck() {
+
+    //reset global variables
+    toHoriz = true;
+    fromHoriz = true;
+    toVert = true;
+    fromVert = true;
+
+    //check blocks
+    if(blocks){
+        for (var k = 0; k < blocks.length; k++) {
+            blocks[k].checkWalls();
+            blocks[k].checkOtherBlocks();
+        }
+    }
+
+    //check balls
+    for (var i = 0; i < balls.length; i++) {
+        balls[i].checkWalls();
+        balls[i].checkBlocks();
+    }
+
+    //top row move up / bottom row move down
+    if (!balls[0].canUp || !balls[1].canUp || !balls[2].canDown || !balls[3].canDown) {
+        fromHoriz = false;
+    }
+    //top row move down / bottom row move up
+    if (!balls[0].canDown || !balls[1].canDown || !balls[2].canUp || !balls[3].canUp) {
+        toHoriz = false;
+    }
+    //left col move left / right col move right
+    if (!balls[0].canLeft || !balls[1].canRight || !balls[2].canRight || !balls[3].canLeft) {
+        fromVert = false;
+    }
+    //left col move right / right col move left
+    if (!balls[0].canRight || !balls[1].canLeft || !balls[2].canLeft || !balls[3].canRight) {
+        toVert = false;
+    }
+}
+
+
+function parseInput() {
+
+    //restart level
+    if (key == 'r' || key == 'R') {
+        //restart level
+        levels[currentLevel].load();
+    }
+    //previous level
+    else if ((key == 'p' || key == 'P') && currentLevel>0) {
+        currentLevel--;
+        levels[currentLevel].load();
+    }
+
+    //next level
+    else if ((key == 'n' || key == 'N') && currentLevel<levels.length-1) {
+        currentLevel++;
+        levels[currentLevel].load();
+    }
+
+    //use WASD to switch between quadrants
+    else if ((key == 'a' || key == 'A') && activeQuad[0] > 0) {
+        activeQuad[0]--;
+    }
+    else if ((key == 'd' || key == 'D') && activeQuad[0] < 1) {
+        activeQuad[0]++;
+    }
+    else if ((key == 'w' || key == 'W') && activeQuad[1] > 0) {
+        activeQuad[1]--;
+    }
+    else if ((key == 's' || key == 'S') && activeQuad[1] < 1) {
+        activeQuad[1]++;
+    }
+    else if (key == CODED) {
+        moveBalls(keyCode);
+    }
+
+}
+
+function moveBalls(keyCode) {
+    globalCheck();
+    for (var i = 0; i < balls.length; i++) {
+        balls[i].parseInput();
+        balls[i].draw();
+    }
+}
+
+function checkWin() {
+    for (var i = 0; i < balls.length; i++) {
+        if (!balls[i].win()) {
+            return false;
+        }
+    }
+    return true;
+}
+
+//mask inactive quadrants
+function drawMask() {
+    for (var i = 0; i < 2; i++) {
+        for (var j = 0; j < 2; j++) {
+            fill(204, 102, 70, 100);
+            if (i !== activeQuad[0] || j !== activeQuad[1]) {
+                rect(i * qs, j * qs, qs, qs);
+            }
+
+        }
+
+    }
+}
+
+function checkGame() {
+    if (checkWin()) {
+        if (currentLevel == levels.length - 1) {
+            jQuery("#subtitle").html("Complete!!!");
+        } else {
+            currentLevel++;
+            levels[currentLevel].load();
+        }
+    }
+}
+
+//LEVELS
+
+levels[0] = new Level();
+levels[0].balls = [
+    [0, 0, 4, 4],
+    [9, 0, 5, 4],
+    [9, 9, 5, 5],
+    [0, 9, 4, 5]
+];
+levels[0].hWalls = [
+    [0, 2],
+    [1, 2],
+    [3, 2],
+    [4, 2]
+];
+
+
+
+levels[1] = new Level();
+levels[1].balls = [
+    [0, 0, 4, 4],
+    [9, 0, 5, 4],
+    [9, 9, 5, 5],
+    [0, 9, 4, 5]
+];
+levels[1].hWalls = [
+    [0, 2],
+    [1, 2],
+    [2, 2],
+    [4, 2],
+
+    [5, 3],
+    [6, 3],
+    [7, 3],
+    [8,3]
+];
+
+
+levels[2] = new Level();
+levels[2].balls = [
+    [0, 0, 4, 4],
+    [9, 0, 5, 4],
+    [9, 9, 5, 5],
+    [0, 9, 4, 5]
+];
+levels[2].hWalls = [
+    [0, 1],
+    [1, 1],
+    [2, 1],
+    [3, 1],
+    [0, 2],
+    [1, 2],
+    [3, 2],
+    [4, 2],
+    [6, 3],
+    [2, 6]
+];
+levels[2].vWalls = [
+    [6, 2],
+    [3, 6]
+];
+
+levels[3] = new Level();
+levels[3].balls = [
+    [0, 0, 4, 4],
+    [9, 0, 5, 4],
+    [9, 9, 5, 5],
+    [0, 9, 4, 5]
+];
+levels[3].hWalls = [
+    [2, 1],
+    [3, 1],
+    [5, 2],
+    [6, 2],
+    [7, 4],
+    [1, 6],
+    [9, 9]
+];
+levels[3].vWalls = [
+    [2, 1],
+    [2, 2],
+    [7, 2],
+    [7, 3],
+    [1, 6],
+    [1, 7],
+    [6, 5],
+    [6, 6]
+];
+levels[3].blocks = [];
+
+
+levels[4] = new Level();
+levels[4].balls = [
+    [1, 1, 3, 4],
+    [8, 0, 6, 3],
+    [7, 8, 5, 5],
+    [2, 9, 4, 6]
+];
+levels[4].hWalls = [
+    [7, 8],
+    [2, 3]
+];
+levels[4].vWalls = [
+    [2, 1],
+    [2, 7],
+    [4, 8],
+    [6, 5],
+    [7, 2],
+    [9, 1]
+];
+levels[4].blocks = [];
+
+levels[5] = new Level();
+levels[5].balls = [
+    [0, 0, 4, 4],
+    [9, 0, 5, 4],
+    [9, 9, 5, 5],
+    [0, 9, 4, 5]
+];
+levels[5].hWalls = [
+    [0, 2],
+    [1, 2],
+    [3, 2],
+    [4, 2]
+];
+levels[5].blocks = [
+    [2,0],
+    [3,0],
+    [2,1]];
+
+levels[6] = new Level();
+levels[6].balls = [
+    [0, 0, 4, 4],
+    [9, 0, 5, 4],
+    [9, 9, 5, 5],
+    [0, 9, 4, 5]
+];
+levels[6].hWalls = [
+    [0, 1],
+    [1, 1],
+    [2, 1],
+    [3, 1],
+    [0, 2],
+    [1, 2],
+    [3, 2],
+    [4, 2],
+    [6, 3],
+    [2, 6]
+];
+levels[6].vWalls = [
+    [6, 2],
+    [3, 6]
+];
+levels[6].blocks = [
+    [2,1],
+    [1,6]
+];
+
+
+levels[7] = new Level();
+levels[7].balls = [
+    [0, 0, 4, 4],
+    [9, 0, 5, 4],
+    [9, 9, 5, 5],
+    [0, 9, 4, 5]
+];
+levels[7].hWalls = [
+    [0,7],
+    [7,3],
+    [7,4],
+    [3,8]
+];
+levels[7].vWalls = [
+    [7,0],
+    [3,7]
+];
+levels[7].blocks = [
+    [1,0],
+    [0,1],
+    [3,3],
+    [1,1],
+    [7,8],
+    [8,7],
+    [5,8],
+    [7,5]
+];
+
+
+
+levels[8] = new Level();
+levels[8].balls = [
+    [4, 4, 0, 0],
+    [5, 4, 9, 0],
+    [5, 5, 9, 9],
+    [4, 5, 0, 9]
+];
+levels[8].hWalls = [
+    [0,7],
+    [7,3],
+    [7,4],
+    [3,8]
+];
+levels[8].vWalls = [
+    [2, 1],
+    [2, 2],
+    [7, 2],
+    [1, 6],
+    [1, 7],
+    [6, 5],
+    [6, 6]
+];
+levels[8].blocks = [
+    [3,3],
+    [1,1],
+    [6,1],
+    [7,8],
+    [8,7],
+    [5,8],
+    [7,5],
+    [8,0]
+];
+
+levels[9] = new Level();
+levels[9].balls = [
+    [1, 4, 3, 4],
+    [8, 3, 6, 3],
+    [7, 5, 5, 5],
+    [2, 6, 4, 6]
+];
+levels[9].hWalls = [
+];
+levels[9].vWalls = [
+
+];
+levels[9].blocks = [
+
+[2,2],
+    [1,8],
+    [2,7],
+    [7,2],
+    [6,8],
+    [4,7],
+    [6,7],
+    [6,5],
+    [8,6]
+];
+
+//PROCESSING
+
+//Setup canvas
+void setup() {
+    size(gridSize * d, gridSize * d);
+    smooth();
+    levels[currentLevel].load();
+    jQuery("#gameCanvas").focus();
+}
+
+//DRAW!!!
+void draw() {
+    drawGrid();
+    //    DrawMap(currentLevel);
+    levels[currentLevel].draw();
+    drawBalls();
+    drawBlocks();
+    drawMask();
+}
+
+
+void keyPressed() {
+    parseInput();
+}
+
+void keyReleased() {
+    //Check if game is over
+    checkGame();
+}
