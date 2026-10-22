@@ -17,6 +17,11 @@ body {
   user-select: none;
 }
 
+.board:focus {
+  outline: 3px solid #005fcc;
+  outline-offset: 2px;
+}
+
 .cell {
   position: absolute;
   width: 60px;

@@ -241,6 +241,8 @@ function Ball(x, y, gx, gy) {
     ball.className = "ball" + (this.active() ? " active" : "");
     ball.style.left = (this.x * d + d / 6) + "px";
     ball.style.top = (this.y * d + d / 6) + "px";
+    ball.setAttribute("role", "img");
+    ball.setAttribute("aria-label", "Ball at " + (this.x + 1) + ", " + (this.y + 1) + ";" + (this.active() ? " active quadrant" : ""));
     ball.setAttribute("data-x", String(this.x));
     ball.setAttribute("data-y", String(this.y));
     board.appendChild(ball);
@@ -304,6 +306,8 @@ function Block(x, y) {
     block.className = "block" + (this.active() ? " active" : "");
     block.style.left = (this.x * d + 4) + "px";
     block.style.top = (this.y * d + 4) + "px";
+    block.setAttribute("role", "img");
+    block.setAttribute("aria-label", "Block at " + (this.x + 1) + ", " + (this.y + 1));
     block.setAttribute("data-x", String(this.x));
     block.setAttribute("data-y", String(this.y));
     board.appendChild(block);
