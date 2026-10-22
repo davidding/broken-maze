@@ -466,6 +466,12 @@ function drawMask(board) {
         mask.style.top = (j * qs) + "px";
         mask.style.width = qs + "px";
         mask.style.height = qs + "px";
+        // Mirror stripe directions so each quadrant's overlay matches its position.
+        var angle = ((i ^ j) === 0) ? 45 : -45;
+        mask.style.backgroundImage =
+          "repeating-linear-gradient(" + angle + "deg, " +
+          "rgba(0, 0, 0, 0.22) 0px, rgba(0, 0, 0, 0.22) 14px, " +
+          "rgba(0, 0, 0, 0) 14px, rgba(0, 0, 0, 0) 28px)";
         board.appendChild(mask);
       }
     }
