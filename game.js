@@ -13,6 +13,7 @@ let toVert = true;
 let fromVert = true;
 
 let currentLevel = 0;
+let winPending = false;
 let activeQuad = [0, 0];
 let balls = [];
 let blocks = [];
@@ -326,6 +327,7 @@ function Level() {
     activeQuad = [0, 0];
     balls = [];
     blocks = [];
+    winPending = false;
 
     const ba = this.balls;
     if (ba) {
@@ -471,6 +473,7 @@ function drawMask(board) {
 }
 
 function moveBalls(keyCode) {
+  if (winPending) { return; }
   globalCheck();
   for (let i = 0; i < balls.length; i++) {
     balls[i].parseInput(keyCode);
@@ -478,6 +481,7 @@ function moveBalls(keyCode) {
 }
 
 function parseInput(key) {
+  if (winPending) { return; }
   const lower = (key || "").toLowerCase();
 
   if (lower === "r") {
@@ -518,14 +522,23 @@ function checkWin() {
 }
 
 function checkGame() {
-  if (checkWin()) {
-    if (currentLevel === levels.length - 1) {
-      setSubtitle("Complete!!!");
-    } else {
-      currentLevel++;
-      levels[currentLevel].load();
-    }
+  if (winPending) {
+    return;
   }
+  if (!checkWin()) {
+    return;
+  }
+  if (currentLevel === levels.length - 1) {
+    setSubtitle("Complete!!!");
+    return;
+  }
+  winPending = true;
+  setSubtitle("Level " + (currentLevel + 1) + " complete! Loading next level...");
+  setTimeout(function () {
+    winPending = false;
+    currentLevel++;
+    levels[currentLevel].load();
+  }, 750);
 }
 
 // Levels data
