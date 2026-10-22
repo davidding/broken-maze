@@ -125,7 +125,7 @@ body {
 .mask {
   position: absolute;
   z-index: 6;
-  background-color: rgba(204, 102, 70, 0.38);
+  background-color: rgba(204, 102, 70, 0.5);
   pointer-events: none;
 }
 
