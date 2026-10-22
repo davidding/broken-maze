@@ -342,7 +342,7 @@ function Level() {
 
     this.load = function () {
         //level name
-        document.getElementById("subtitle").innerHTML = "Level " + (currentLevel + 1);
+        setSubtitle("Level " + (currentLevel + 1));
 
         //reset active quad, global balls and blocks arrays
         activeQuad = [0, 0];
@@ -545,10 +545,18 @@ function drawMask() {
     }
 }
 
+function setSubtitle(text) {
+    var subtitle = document.getElementById("subtitle");
+    if (!subtitle) {
+        return;
+    }
+    subtitle.textContent = text;
+}
+
 function checkGame() {
     if (checkWin()) {
         if (currentLevel == levels.length - 1) {
-            document.getElementById("subtitle").innerHTML = "Complete!!!";
+            setSubtitle("Complete!!!");
         } else {
             currentLevel++;
             levels[currentLevel].load();
@@ -810,7 +818,7 @@ void setup() {
     size(gridSize * d, gridSize * d);
     smooth();
     levels[currentLevel].load();
-    document.getElementById("gameCanvas").focus();
+    externals.canvas.focus();
 }
 
 //DRAW!!!
