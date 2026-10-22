@@ -1,0 +1,17 @@
+#!/bin/sh
+# Deterministic guard: when running inside the pi coding agent, require the
+# attribution footer to use the provider/model from PI_PROVIDER/PI_MODEL.
+if [ "$PI_CODING_AGENT" != "true" ]; then
+  exit 0
+fi
+if [ -z "$PI_PROVIDER" ] || [ -z "$PI_MODEL" ]; then
+  exit 0
+fi
+
+msg_file="$1"
+expected="🤖 Created with pi coding agent (model: ${PI_PROVIDER}/${PI_MODEL})"
+if ! grep -Fq "$expected" "$msg_file"; then
+  echo "Missing or incorrect attribution footer." >&2
+  echo "Expected: $expected" >&2
+  exit 1
+fi
