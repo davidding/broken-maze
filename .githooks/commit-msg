@@ -1,0 +1,63 @@
+#!/bin/sh
+# Agent-aware but agent-agnostic attribution guard.
+
+# Discover standardized variables (preferred), with harness-specific fallbacks.
+if [ -n "${CODING_AGENT:-}" ]; then
+  agent=true
+  harness="${CODING_AGENT}"
+else
+  agent=false
+  harness=""
+fi
+if [ "${PI_CODING_AGENT:-}" = "true" ]; then
+  agent=true
+  harness="${harness:-pi}"
+  CODING_AGENT_PROVIDER="${CODING_AGENT_PROVIDER:-${PI_PROVIDER:-}}"
+  CODING_AGENT_MODEL="${CODING_AGENT_MODEL:-${PI_MODEL:-}}"
+fi
+if [ "${OPENCODE_CODING_AGENT:-}" = "true" ]; then
+  agent=true
+  harness="${harness:-opencode}"
+  CODING_AGENT_PROVIDER="${CODING_AGENT_PROVIDER:-${OPENCODE_PROVIDER:-}}"
+  CODING_AGENT_MODEL="${CODING_AGENT_MODEL:-${OPENCODE_MODEL:-}}"
+fi
+if [ "${OMP_CODING_AGENT:-}" = "true" ]; then
+  agent=true
+  harness="${harness:-omp}"
+  CODING_AGENT_PROVIDER="${CODING_AGENT_PROVIDER:-${OMP_PROVIDER:-}}"
+  CODING_AGENT_MODEL="${CODING_AGENT_MODEL:-${OMP_MODEL:-}}"
+fi
+if [ -n "${CODING_AGENT_PROVIDER:-}" ] || [ -n "${CODING_AGENT_MODEL:-}" ]; then
+  agent=true
+fi
+
+# Agent commits use an author/committer identity containing "(agent)".
+if [ "$agent" != true ]; then
+  author_name="$(git config user.name 2>/dev/null || true)"
+  case "$author_name" in
+    *"(agent)"*) agent=true ;;
+  esac
+fi
+
+# Only enforce during agent sessions.
+[ "$agent" = true ] || exit 0
+
+msg_file="$1"
+
+# When provider/model are known, require the exact standard footer.
+if [ -n "${CODING_AGENT_PROVIDER:-}" ] && [ -n "${CODING_AGENT_MODEL:-}" ]; then
+  h="${harness:-coding}"
+  expected="🤖 Created with ${h} coding agent (model: ${CODING_AGENT_PROVIDER}/${CODING_AGENT_MODEL})"
+  if ! grep -Fq "$expected" "$msg_file"; then
+    echo "Missing or incorrect attribution footer." >&2
+    echo "Expected: $expected" >&2
+    exit 1
+  fi
+  exit 0
+fi
+
+# Otherwise, require at least a standard attribution line.
+if ! grep -Eq '🤖 Created with .+ coding agent .*\(model: .+/.+\)' "$msg_file"; then
+  echo "Missing attribution footer (expected: 🤖 Created with <harness> coding agent (model: <provider>/<model>))." >&2
+  exit 1
+fi
